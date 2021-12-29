@@ -1,0 +1,6 @@
+- [x] Create architecture: functional core imperative shell
+- [x] Add ability to list all files
+- [ ] Add ability to construct commands for files
+- [ ] Add in where clauses
+- [ ] Wire up to shell
+- [ ] Add ability to do stack based things?

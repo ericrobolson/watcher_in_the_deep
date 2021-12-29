@@ -6,10 +6,10 @@
 
 CUR_DIR=${PWD}
 DEV_ENV=.dev_env
-PROGRAM= "in . do echo NAME end"
+PROGRAM="in . do echo NAME end"
 
 # Clone dev-env if it doesn't exist
-[ ! -d ${DEV_ENV} ] && git clone https://github.com/ericrobolson/dev-env.git ${DEV_ENV}
+[ ! -d ${DEV_ENV} ] && git clone https://github.com/ericrobolson/watcher_in_the_deep ${DEV_ENV}
 
 # Update dev-env
 cd ${DEV_ENV}
@@ -17,4 +17,4 @@ git checkout -- .
 git pull
 
 # Run the program
-cargo run --release ${PROGRAM}
+cargo run --release $PROGRAM

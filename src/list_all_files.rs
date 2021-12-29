@@ -1,8 +1,8 @@
 use crate::types::File;
-
 use std::time::SystemTime;
 use walkdir::WalkDir;
 
+/// Retrieves all files under the given path.
 pub fn execute(path: &str) -> Vec<File> {
     WalkDir::new(path)
         .into_iter()

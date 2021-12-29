@@ -1,48 +1,70 @@
-mod ops;
+mod command;
+use std::collections::HashMap;
+
+pub use command::*;
+
+use crate::types::File;
 
 /// An error that may be returned by WITD.
 #[derive(Clone, Copy, Debug, PartialEq)]
-pub enum WError {}
+pub enum WitdErr {
+    CommandErr(CommandErr),
+}
+impl From<CommandErr> for WitdErr {
+    fn from(e: CommandErr) -> Self {
+        Self::CommandErr(e)
+    }
+}
 
 /// An operation to perform.
 pub enum Op {}
 
 pub struct Witd {
-    paths: Vec<String>,
-    should_exit: bool,
+    command: Command,
+    files: HashMap<String, File>,
 }
 
 impl Witd {
-    /// Adds a path to WITD
-    pub fn add_path(&mut self, path: &str) -> Result<(), WError> {
-        self.paths.push(path.to_string());
-        self.paths.dedup();
-
-        Ok(())
-    }
-
-    /// Returns the list of registered paths
-    pub fn paths(&self) -> &[String] {
-        &self.paths
-    }
-
-    // TODO: tests
-    pub fn new() -> Self {
+    pub fn new(command: Command) -> Self {
         Self {
-            paths: vec![],
-            should_exit: false,
+            command,
+            files: HashMap::new(),
         }
     }
 
-    pub fn execute(&mut self, op: Op) {}
+    // TODO: tests
+    fn insert(&mut self, file: File) {
+        self.files.insert(file.path.clone(), file);
+    }
 
     // TODO: tests
-    pub fn should_exit(&self) -> bool {
-        self.should_exit
+    fn get_file(&self, file: &File) -> Option<&File> {
+        self.files.get(&file.path)
     }
-    // TODO: tests
-    pub fn quit(&mut self) {
-        self.should_exit = true;
+
+    pub fn execute(&mut self, files: Vec<File>) -> Result<(), WitdErr> {
+        for file in files.iter() {
+            let should_execute = match self.get_file(file) {
+                Some(existing) => {
+                    if existing.is_older(file) {
+                        self.insert(file.clone());
+                        true
+                    } else {
+                        false
+                    }
+                }
+                None => {
+                    self.insert(file.clone());
+                    true
+                }
+            };
+
+            if should_execute {
+                self.command.execute(file);
+            }
+        }
+
+        Ok(())
     }
 }
 
@@ -51,52 +73,10 @@ mod tests {
     use super::*;
 
     describe!(add_path => {
-        #[test]
-        fn adds_path(){
-            let mut witd = Witd::new();
 
-            let path: String = "testy.msct".into();
-            let res = witd.add_path(&path);
-
-            assert_eq!(Ok(()), res);
-            assert_eq!(vec![path], witd.paths);
-        }
-
-        #[test]
-        fn dedups_duplicate_paths(){
-            let mut witd = Witd::new();
-
-            let path: String = "testy.msct".into();
-
-            let res = witd.add_path(&path);
-            assert_eq!(Ok(()), res);
-
-            let res = witd.add_path(&path);
-            assert_eq!(Ok(()), res);
-
-            let res = witd.add_path(&path);
-            assert_eq!(Ok(()), res);
-
-            assert_eq!(vec![path], witd.paths);
-        }
     });
 
     describe!(paths => {
-        #[test]
-        fn returns_empty(){
-            let expected: Vec<String> = vec![];
-            let witd = Witd::new();
 
-            assert_eq!(&expected, witd.paths());
-        }
-
-          #[test]
-        fn returns_expected(){
-            let expected: Vec<String> = vec!["testy".into(), "foo bar".into()];
-            let mut witd = Witd::new();
-            witd.paths = expected.clone();
-
-            assert_eq!(&expected, witd.paths());
-        }
     });
 }

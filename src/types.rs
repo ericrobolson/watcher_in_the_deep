@@ -4,6 +4,7 @@ use std::time::Duration;
 #[derive(Clone, Debug, PartialEq, PartialOrd)]
 pub struct File {
     pub created_at: Duration,
+    pub directory: String,
     pub extension: String,
     pub modified_at: Duration,
     pub name: String,
@@ -24,6 +25,7 @@ mod tests {
     fn file() -> File {
         File {
             created_at: Duration::from_secs_f32(3.9),
+            directory: "Test//test".into(),
             extension: "ext".into(),
             modified_at: Duration::from_secs_f32(3.9),
             name: "test".into(),

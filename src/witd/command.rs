@@ -1,4 +1,4 @@
-use super::{CommandErr, RunMode};
+use super::{CommandErr, RunMode, ScriptOptions};
 use crate::{traits::PrettyPrint, types::File, witd::Keyword};
 use std::process;
 
@@ -116,10 +116,20 @@ impl Command {
 
     /// Returns a stringified version of the command to execute.
     fn execution(&self, file: &File) -> String {
-        self.command
-            .replace("PATH", &file.path)
-            .replace("NAME", &file.name)
-            .replace("EXT", &file.extension)
+        let mut command = self.command.clone();
+        for script_option in ScriptOptions::values() {
+            let identifier = script_option.pretty_print();
+            let value = match script_option {
+                ScriptOptions::Directory => &file.directory,
+                ScriptOptions::Ext => &file.extension,
+                ScriptOptions::Name => &file.name,
+                ScriptOptions::Path => &file.path,
+            };
+
+            command = command.replace(&identifier, value);
+        }
+
+        command
     }
 
     /// Executes the given command on the given file.
@@ -159,6 +169,7 @@ mod tests {
     fn file() -> File {
         File {
             created_at: Duration::from_millis(333),
+            directory: "./testy".into(),
             extension: "obj".into(),
             modified_at: Duration::from_millis(444),
             name: "testy-mctest.obj".into(),
@@ -182,6 +193,15 @@ mod tests {
     });
 
     describe!(execution => {
+       #[test]
+        fn dir_replaces_filename(){
+            let mut command = cmd();
+            command.command = "echo DIR".into();
+
+            let expected = format!("echo {}", file().directory);
+            assert_eq!(expected, command.execution(&file()));
+        }
+
         #[test]
         fn name_replaces_filename(){
             let mut command = cmd();

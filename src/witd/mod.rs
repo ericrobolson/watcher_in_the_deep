@@ -23,9 +23,6 @@ impl From<CommandErr> for WitdErr {
     }
 }
 
-/// An operation to perform.
-pub enum Op {}
-
 pub struct Witd {
     command: Command,
     files: HashMap<String, File>,
@@ -50,6 +47,7 @@ impl Witd {
     }
 
     pub fn execute(&mut self, files: Vec<File>) -> Result<(), WitdErr> {
+        let mut execute_directory = false;
         for file in files.iter() {
             let should_execute = match self.get_file(file) {
                 Some(existing) => {
@@ -67,8 +65,16 @@ impl Witd {
             };
 
             if should_execute {
-                self.command.execute(file);
+                if self.command.run_mode() == RunMode::File {
+                    self.command.execute(Some(file));
+                } else {
+                    execute_directory = true;
+                }
             }
+        }
+
+        if execute_directory {
+            self.command.execute(None);
         }
 
         Ok(())
@@ -78,6 +84,11 @@ impl Witd {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn tests() {
+        todo!("WITD tests!");
+    }
 
     describe!(add_path => {
 

@@ -3,7 +3,6 @@
 - [x] Add ability to construct commands for files
 - [x] Wire up to shell
 - [x] Redo code structure + add tests
-- [ ] Redo parsing to allow run modes and follow examples
+- [x] Redo parsing to allow run modes and follow examples
 - [ ] Add validation for interpolated vars depending on run mode.
 - [ ] Add in where clauses to skip directories, file types, etc.
-

@@ -6,7 +6,7 @@
 
 CUR_DIR=${PWD}
 DEV_ENV=.witd
-PROGRAM="in . do echo NAME end"
+PROGRAM="foreach file in . do echo NAME end"
 
 # Clone dev-env if it doesn't exist
 [ ! -d ${DEV_ENV} ] && git clone https://github.com/ericrobolson/watcher_in_the_deep ${DEV_ENV}

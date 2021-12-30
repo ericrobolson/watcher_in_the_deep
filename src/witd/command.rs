@@ -2,15 +2,6 @@ use super::{CommandErr, RunMode, ScriptOptions};
 use crate::{traits::PrettyPrint, types::File, witd::Keyword};
 use std::process;
 
-#[derive(Clone, Copy, Debug, PartialEq)]
-enum ParseState {
-    CheckingCommand,
-    CheckingDo,
-    CheckingRunMode,
-    CheckingPath,
-    Fin,
-}
-
 /// A command that may be executed.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Command {
@@ -19,71 +10,107 @@ pub struct Command {
     run_mode: RunMode,
 }
 impl Command {
+    /// Parses the given command.
     pub fn parse(s: &str) -> Result<Self, CommandErr> {
-        let mut parse_state = ParseState::CheckingRunMode;
-
+        // Check if empty input
         if s.trim().len() == 0 {
             return Err(CommandErr::EmptyInput);
         }
 
-        let mut path = None;
-        let mut command: Vec<String> = vec![];
+        // Calculate run mode
+        let (run_mode, s) = {
+            let file_mode = format!("foreach {} in", RunMode::File.pretty_print());
+            let directory_mode = RunMode::Directory.pretty_print();
 
-        let split = s.split_ascii_whitespace();
-        for token in split {
-            match parse_state {
-                ParseState::CheckingRunMode => {
-                    if token.to_lowercase() != "in" {
+            let is_file_mode = s.starts_with(&file_mode);
+            let is_directory_mode = s.starts_with(&directory_mode);
+
+            if !is_file_mode && !is_directory_mode {
+                return Err(CommandErr::MissingRunMode);
+            }
+
+            let mode = if is_directory_mode {
+                RunMode::Directory
+            } else {
+                RunMode::File
+            };
+
+            let s = s
+                .to_string()
+                .replace(&file_mode, "")
+                .replace(&directory_mode, "")
+                .trim()
+                .to_string();
+
+            (mode, s)
+        };
+
+        if s.trim().is_empty() {
+            return Err(CommandErr::MissingPathSpecification);
+        }
+
+        // Make path
+        let (root_path, s) = {
+            let mut path = String::default();
+
+            for c in s.chars() {
+                if c.is_whitespace() {
+                    break;
+                } else {
+                    path.push(c);
+                }
+            }
+
+            let s = s.replace(&path, "").trim().to_string();
+
+            (path, s)
+        };
+
+        // Make do
+        let s = {
+            let keyword = Keyword::Do.pretty_print();
+            if !s.starts_with(&keyword) {
+                return Err(CommandErr::MissingKeywordDo);
+            }
+
+            s.replace(&keyword, "").trim().to_string()
+        };
+
+        // Parse command
+        let (command, s) = {
+            let mut command = String::default();
+            let end = Keyword::End.pretty_print();
+            let mut found_end = s.starts_with(&end);
+            let mut s = s;
+
+            if !found_end {
+                while s.len() > 0 {
+                    let c = s.remove(0);
+
+                    if s.starts_with(&end) && c.is_whitespace() {
+                        found_end = true;
+                        s = s.replacen(&end, "", 1);
                         break;
                     } else {
-                        parse_state = ParseState::CheckingPath;
-                    }
-                }
-                ParseState::CheckingPath => {
-                    path = Some(token.to_string());
-                    parse_state = ParseState::CheckingDo;
-                }
-                ParseState::CheckingCommand => {
-                    if token.to_lowercase() == "end" {
-                        parse_state = ParseState::Fin;
-                    } else {
-                        command.push(token.to_string());
-                    }
-                }
-                ParseState::Fin => {}
-                ParseState::CheckingDo => {
-                    if token.to_lowercase() != "do" {
-                        break;
-                    } else {
-                        parse_state = ParseState::CheckingCommand;
+                        command.push(c);
                     }
                 }
             }
-        }
 
-        // Final check for state
-        let error = match parse_state {
-            ParseState::CheckingRunMode => Some(CommandErr::MissingRunMode),
-            ParseState::CheckingDo => Some(CommandErr::MissingKeywordDo),
-            ParseState::CheckingCommand => Some(CommandErr::MissingKeywordEnd),
-            ParseState::CheckingPath => Some(CommandErr::MissingPathSpecification),
-            ParseState::Fin => None,
+            if !found_end {
+                return Err(CommandErr::MissingKeywordEnd);
+            }
+
+            (command, s)
         };
 
-        if let Some(error) = error {
-            return Err(error);
-        }
+        // TODO: where clauses
 
-        let path = match path {
-            Some(path) => path,
-            None => return Err(CommandErr::MissingPathSpecification),
-        };
-
-        let run_mode = RunMode::File;
+        // TODO: ensure only whitelisted values are present
 
         Ok(Self {
-            command: command.join(" "),
-            root_path: path,
+            command,
+            root_path,
             run_mode,
         })
     }
@@ -115,25 +142,30 @@ impl Command {
     }
 
     /// Returns a stringified version of the command to execute.
-    fn execution(&self, file: &File) -> String {
+    fn execution(&self, file: Option<&File>) -> String {
         let mut command = self.command.clone();
-        for script_option in ScriptOptions::values() {
-            let identifier = script_option.pretty_print();
-            let value = match script_option {
-                ScriptOptions::Directory => &file.directory,
-                ScriptOptions::Ext => &file.extension,
-                ScriptOptions::Name => &file.name,
-                ScriptOptions::Path => &file.path,
-            };
 
-            command = command.replace(&identifier, value);
+        if let Some(file) = file {
+            for script_option in ScriptOptions::values() {
+                let identifier = script_option.pretty_print();
+                let value = match script_option {
+                    ScriptOptions::Directory => &file.directory,
+                    ScriptOptions::Ext => &file.extension,
+                    ScriptOptions::Name => &file.name,
+                    ScriptOptions::Path => &file.path,
+                };
+
+                command = command.replace(&identifier, value);
+            }
         }
+
+        command = command.replace(&ScriptOptions::Directory.pretty_print(), &self.root_path);
 
         command
     }
 
     /// Executes the given command on the given file.
-    pub fn execute(&self, file: &File) {
+    pub fn execute(&self, file: Option<&File>) {
         // rather hacky, but this will build up a command to execute by splitting off the tokens and the like.
         let cmd = self.execution(file);
 
@@ -158,6 +190,11 @@ impl Command {
     pub fn root_path(&self) -> &String {
         &self.root_path
     }
+
+    /// Returns the run mode for the command.
+    pub fn run_mode(&self) -> RunMode {
+        self.run_mode
+    }
 }
 
 #[cfg(test)]
@@ -180,7 +217,7 @@ mod tests {
     fn cmd() -> Command {
         Command {
             command: "echo NAME".into(),
-            root_path: "".into(),
+            root_path: "testy/test/src".into(),
             run_mode: RunMode::File,
         }
     }
@@ -199,7 +236,16 @@ mod tests {
             command.command = "echo DIR".into();
 
             let expected = format!("echo {}", file().directory);
-            assert_eq!(expected, command.execution(&file()));
+            assert_eq!(expected, command.execution(Some(&file())));
+        }
+
+          #[test]
+        fn dir_replaces_filename_if_no_file(){
+            let mut command = cmd();
+            command.command = "echo DIR".into();
+
+            let expected = format!("echo {}", cmd().root_path());
+            assert_eq!(expected, command.execution(None));
         }
 
         #[test]
@@ -208,7 +254,7 @@ mod tests {
             command.command = "echo NAME".into();
 
             let expected = format!("echo {}", file().name);
-            assert_eq!(expected, command.execution(&file()));
+            assert_eq!(expected, command.execution(Some(&file())));
         }
 
         #[test]
@@ -216,7 +262,7 @@ mod tests {
             let command = Command{ command: "echo PATH".into(), root_path: "".into(), run_mode: RunMode::File };
 
             let expected = format!("echo {}", file().path);
-            assert_eq!(expected, command.execution(&file()));
+            assert_eq!(expected, command.execution(Some(&file())));
         }
 
         #[test]
@@ -224,7 +270,7 @@ mod tests {
             let command = Command{ command: "echo EXT".into(), root_path: "".into(), run_mode: RunMode::File };
 
             let expected = format!("echo {}", file().extension);
-            assert_eq!(expected, command.execution(&file()));
+            assert_eq!(expected, command.execution(Some(&file())));
         }
 
         #[test]
@@ -232,57 +278,107 @@ mod tests {
             let command = Command{ command: "echo testy_NAME_path_PATH_ext_EXT".into(), root_path: "".into(), run_mode: RunMode::File };
 
             let expected = format!("echo testy_{name}_path_{path}_ext_{ext}", name = file().name, path = file().path, ext = file().extension);
-            assert_eq!(expected, command.execution(&file()));
+            assert_eq!(expected, command.execution(Some(&file())));
         }
     });
 
     describe!(parse => {
-       #[test]
-        fn empty_input_returns_error(){
-            let input = "  ";
+        fn parse(input: &str) -> Result<Command, CommandErr>{
+            Command::parse(input)
+        }
+
+        #[test]
+        fn empty_input_returns_err(){
+            let input = " ";
+
             let expected = Err(CommandErr::EmptyInput);
+            let actual = parse(input);
 
-            assert_eq!(expected, Command::parse(input));
+            assert_eq!(expected, actual);
         }
 
         #[test]
-        fn missing_keyword_in(){
-            let input = " . execute \"echo {filename}\"";
+        fn missing_run_mode_returns_err(){
+            let input = " garbage day";
+
             let expected = Err(CommandErr::MissingRunMode);
+            let actual = parse(input);
 
-            assert_eq!(expected, Command::parse(input));
+            assert_eq!(expected, actual);
         }
 
-        #[test]
-        fn missing_path_specification(){
-            let input = "in ";
-            let expected = Err(CommandErr::MissingPathSpecification);
+        const MODES: [(RunMode, &'static str); 2] = [
+            (RunMode::Directory,"directory"),
+            (RunMode::File, "foreach file in")
+        ];
 
-            assert_eq!(expected, Command::parse(input));
+        #[test]
+        fn missing_path_returns_err(){
+            for (_, mode) in MODES{
+                let input = format!("{}", mode);
+
+                let expected = Err(CommandErr::MissingPathSpecification);
+                let actual = parse(&input);
+
+                assert_eq!(expected, actual);
+            }
         }
 
         #[test]
         fn missing_keyword_do(){
-            let input = "in . ";
-            let expected = Err(CommandErr::MissingKeywordDo);
+            for (_, mode) in MODES{
+                let input = format!("{} ./src/path end", mode);
 
-            assert_eq!(expected, Command::parse(input));
+                let expected = Err(CommandErr::MissingKeywordDo);
+                let actual = parse(&input);
+
+                assert_eq!(expected, actual);
+            }
         }
 
         #[test]
         fn missing_keyword_end(){
-            let input = "in . do some random stuff";
-            let expected = Err(CommandErr::MissingKeywordEnd);
+            for (_, mode) in MODES{
+                let input = format!("{} ./src/path do some gobblygook", mode);
 
-            assert_eq!(expected, Command::parse(input));
+                let expected = Err(CommandErr::MissingKeywordEnd);
+                let actual = parse(&input);
+
+                assert_eq!(expected, actual);
+            }
         }
 
         #[test]
-        fn happy_path_no_where_clauses(){
-            let input = "in . do some random stuff end";
-            let expected = Ok(Command{ root_path: ".".into(), command: "some random stuff".into(), run_mode: RunMode::File });
+        fn happy_path_empty_command(){
+            for (run_mode, mode) in MODES{
+                let input = format!("{} ./src/path do end", mode);
 
-            assert_eq!(expected, Command::parse(input));
+                let expected = Ok(Command{ command:
+                    "".into(), root_path: "./src/path".into(), run_mode });
+                let actual = parse(&input);
+
+                assert_eq!(expected, actual);
+            }
         }
+
+        #[test]
+        fn happy_path_with_command(){
+            for (run_mode, mode) in MODES{
+                let input = format!("{} ./src/path do echo \"HI\" end", mode);
+
+                let expected = Ok(Command{ command:
+                    "echo \"HI\"".into(), root_path: "./src/path".into(), run_mode });
+                let actual = parse(&input);
+
+                assert_eq!(expected, actual);
+            }
+        }
+
+        #[test]
+        fn validate_command_values(){
+          todo!("Ensure that interpolated values are whitelisted")
+        }
+
+
     });
 }

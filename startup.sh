@@ -1,11 +1,11 @@
 #!/bin/bash
 
 # This script will clone the tool, then launch it. 
-# It is suggested you add a .gitignore entry for `.dev_env`.
+# It is suggested you add a .gitignore entry for `.witd`.
 # You may also want to modify the PROGRAM env var.
 
 CUR_DIR=${PWD}
-DEV_ENV=.dev_env
+DEV_ENV=.witd
 PROGRAM="in . do echo NAME end"
 
 # Clone dev-env if it doesn't exist

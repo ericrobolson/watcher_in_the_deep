@@ -1,9 +1,16 @@
 mod command;
-use std::collections::HashMap;
-
-pub use command::*;
+mod command_err;
+mod keywords;
+mod run_mode;
+mod script_options;
 
 use crate::types::File;
+pub use command::*;
+pub use command_err::*;
+pub use keywords::*;
+pub use run_mode::*;
+pub use script_options::*;
+use std::collections::HashMap;
 
 /// An error that may be returned by WITD.
 #[derive(Clone, Copy, Debug, PartialEq)]

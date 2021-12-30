@@ -1,21 +1,12 @@
-use crate::types::File;
+use super::{CommandErr, RunMode};
+use crate::{traits::PrettyPrint, types::File, witd::Keyword};
 use std::process;
 
-/// An error that may occur for a command.
 #[derive(Clone, Copy, Debug, PartialEq)]
-pub enum CommandErr {
-    EmptyInput,
-    MissingKeywordDo,
-    MissingKeywordEnd,
-    MissingKeywordIn,
-    MissingPathSpecification,
-}
-
-#[derive(Clone, Debug, PartialEq)]
 enum ParseState {
     CheckingCommand,
     CheckingDo,
-    CheckingIn,
+    CheckingRunMode,
     CheckingPath,
     Fin,
 }
@@ -23,12 +14,13 @@ enum ParseState {
 /// A command that may be executed.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Command {
-    root_path: String,
     command: String,
+    root_path: String,
+    run_mode: RunMode,
 }
 impl Command {
     pub fn parse(s: &str) -> Result<Self, CommandErr> {
-        let mut parse_state = ParseState::CheckingIn;
+        let mut parse_state = ParseState::CheckingRunMode;
 
         if s.trim().len() == 0 {
             return Err(CommandErr::EmptyInput);
@@ -40,7 +32,7 @@ impl Command {
         let split = s.split_ascii_whitespace();
         for token in split {
             match parse_state {
-                ParseState::CheckingIn => {
+                ParseState::CheckingRunMode => {
                     if token.to_lowercase() != "in" {
                         break;
                     } else {
@@ -71,7 +63,7 @@ impl Command {
 
         // Final check for state
         let error = match parse_state {
-            ParseState::CheckingIn => Some(CommandErr::MissingKeywordIn),
+            ParseState::CheckingRunMode => Some(CommandErr::MissingRunMode),
             ParseState::CheckingDo => Some(CommandErr::MissingKeywordDo),
             ParseState::CheckingCommand => Some(CommandErr::MissingKeywordEnd),
             ParseState::CheckingPath => Some(CommandErr::MissingPathSpecification),
@@ -87,10 +79,39 @@ impl Command {
             None => return Err(CommandErr::MissingPathSpecification),
         };
 
+        let run_mode = RunMode::File;
+
         Ok(Self {
-            root_path: path,
             command: command.join(" "),
+            root_path: path,
+            run_mode,
         })
+    }
+
+    /// Returns an example command.
+    pub fn examples() -> Vec<String> {
+        let ex1 = format!(
+            "{} ./src {} echo {options} end",
+            RunMode::Directory.pretty_print(),
+            Keyword::Do.pretty_print(),
+            options = RunMode::Directory
+                .allowed_options()
+                .iter()
+                .map(|m| m.pretty_print())
+                .collect::<Vec<String>>()
+                .join("|")
+        );
+        let ex2 = format!(
+            "foreach file in ./src do echo {options} end",
+            options = RunMode::File
+                .allowed_options()
+                .iter()
+                .map(|m| m.pretty_print())
+                .collect::<Vec<String>>()
+                .join("|")
+        );
+
+        vec![ex1, ex2]
     }
 
     /// Returns a stringified version of the command to execute.
@@ -145,10 +166,26 @@ mod tests {
         }
     }
 
+    fn cmd() -> Command {
+        Command {
+            command: "echo NAME".into(),
+            root_path: "".into(),
+            run_mode: RunMode::File,
+        }
+    }
+
+    describe!(examples => {
+        #[test]
+        fn examples() {
+            assert_eq!(vec!["directory ./src do echo DIR end".to_string(), "foreach file in ./src do echo DIR|EXT|NAME|PATH end".to_string()], Command::examples());
+        }
+    });
+
     describe!(execution => {
         #[test]
         fn name_replaces_filename(){
-            let command = Command{ command: "echo NAME".into(), root_path: "".into() };
+            let mut command = cmd();
+            command.command = "echo NAME".into();
 
             let expected = format!("echo {}", file().name);
             assert_eq!(expected, command.execution(&file()));
@@ -156,7 +193,7 @@ mod tests {
 
         #[test]
         fn path_replaces_path(){
-            let command = Command{ command: "echo PATH".into(), root_path: "".into() };
+            let command = Command{ command: "echo PATH".into(), root_path: "".into(), run_mode: RunMode::File };
 
             let expected = format!("echo {}", file().path);
             assert_eq!(expected, command.execution(&file()));
@@ -164,7 +201,7 @@ mod tests {
 
         #[test]
         fn ext_replaces_ext(){
-            let command = Command{ command: "echo EXT".into(), root_path: "".into() };
+            let command = Command{ command: "echo EXT".into(), root_path: "".into(), run_mode: RunMode::File };
 
             let expected = format!("echo {}", file().extension);
             assert_eq!(expected, command.execution(&file()));
@@ -172,7 +209,7 @@ mod tests {
 
         #[test]
         fn complex(){
-            let command = Command{ command: "echo testy_NAME_path_PATH_ext_EXT".into(), root_path: "".into() };
+            let command = Command{ command: "echo testy_NAME_path_PATH_ext_EXT".into(), root_path: "".into(), run_mode: RunMode::File };
 
             let expected = format!("echo testy_{name}_path_{path}_ext_{ext}", name = file().name, path = file().path, ext = file().extension);
             assert_eq!(expected, command.execution(&file()));
@@ -191,7 +228,7 @@ mod tests {
         #[test]
         fn missing_keyword_in(){
             let input = " . execute \"echo {filename}\"";
-            let expected = Err(CommandErr::MissingKeywordIn);
+            let expected = Err(CommandErr::MissingRunMode);
 
             assert_eq!(expected, Command::parse(input));
         }
@@ -223,7 +260,7 @@ mod tests {
         #[test]
         fn happy_path_no_where_clauses(){
             let input = "in . do some random stuff end";
-            let expected = Ok(Command{ root_path: ".".into(), command: "some random stuff".into() });
+            let expected = Ok(Command{ root_path: ".".into(), command: "some random stuff".into(), run_mode: RunMode::File });
 
             assert_eq!(expected, Command::parse(input));
         }

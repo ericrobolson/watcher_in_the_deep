@@ -2,9 +2,8 @@
 - [x] Add ability to list all files
 - [x] Add ability to construct commands for files
 - [x] Wire up to shell
-- [ ] Clean up and add tests
-- [ ] Add validation for interpolated vars, like `{name}, {path}, {ext}`.
-- [ ] Add a 'directory' clause which gives the directory
+- [x] Redo code structure + add tests
+- [ ] Redo parsing to allow run modes and follow examples
+- [ ] Add validation for interpolated vars depending on run mode.
 - [ ] Add in where clauses to skip directories, file types, etc.
-- [ ] Add ability to only execute a single command for any file change in a directory vs running it on each. E.g. `for any in ./src do cargo test end`
-- [ ] Determine how to handle errors with commands
+

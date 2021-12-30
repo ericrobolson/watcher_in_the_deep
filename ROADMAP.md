@@ -6,3 +6,4 @@
 - [x] Redo parsing to allow run modes and follow examples
 - [ ] Add validation for interpolated vars depending on run mode.
 - [ ] Add in where clauses to skip directories, file types, etc.
+- [ ] Do a deep dive on the blog

@@ -1,9 +1,16 @@
 mod command;
-use std::collections::HashMap;
-
-pub use command::*;
+mod command_err;
+mod keywords;
+mod run_mode;
+mod script_options;
 
 use crate::types::File;
+pub use command::*;
+pub use command_err::*;
+pub use keywords::*;
+pub use run_mode::*;
+pub use script_options::*;
+use std::collections::HashMap;
 
 /// An error that may be returned by WITD.
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -15,9 +22,6 @@ impl From<CommandErr> for WitdErr {
         Self::CommandErr(e)
     }
 }
-
-/// An operation to perform.
-pub enum Op {}
 
 pub struct Witd {
     command: Command,
@@ -43,6 +47,7 @@ impl Witd {
     }
 
     pub fn execute(&mut self, files: Vec<File>) -> Result<(), WitdErr> {
+        let mut execute_directory = false;
         for file in files.iter() {
             let should_execute = match self.get_file(file) {
                 Some(existing) => {
@@ -60,8 +65,16 @@ impl Witd {
             };
 
             if should_execute {
-                self.command.execute(file);
+                if self.command.run_mode() == RunMode::File {
+                    self.command.execute(Some(file));
+                } else {
+                    execute_directory = true;
+                }
             }
+        }
+
+        if execute_directory {
+            self.command.execute(None);
         }
 
         Ok(())
@@ -71,6 +84,11 @@ impl Witd {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn tests() {
+        todo!("WITD tests!");
+    }
 
     describe!(add_path => {
 

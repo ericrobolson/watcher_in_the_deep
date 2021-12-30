@@ -3,13 +3,17 @@
 mod test_helpers;
 
 mod list_all_files;
+mod traits;
 mod types;
 mod witd;
 
 use std::env;
 use witd::{Witd, WitdErr};
 
-use crate::witd::{Command, CommandErr};
+use crate::{
+    traits::PrettyPrint,
+    witd::{Command, CommandErr},
+};
 
 fn main() -> Result<(), WitdErr> {
     let args: Vec<String> = env::args().collect();
@@ -36,32 +40,15 @@ fn handle_parse_command(command: &str) -> Result<Command, CommandErr> {
     match Command::parse(command) {
         Ok(command) => Ok(command),
         Err(e) => {
-            let (error, example) = match e {
-                CommandErr::EmptyInput => ("Empty input was provided.", "in . do echo {name} end"),
-                CommandErr::MissingKeywordDo => {
-                    ("Missing keyword 'do'.", "in . do echo {name} end")
-                }
-
-                CommandErr::MissingKeywordEnd => {
-                    ("Missing keyword 'end'.", "in . do echo {name} end")
-                }
-                CommandErr::MissingKeywordIn => {
-                    ("Missing keyword 'in'.", "in . do echo {name} end")
-                }
-                CommandErr::MissingPathSpecification => {
-                    ("Missing path specification.", "in . do echo {name} end")
-                }
-            };
-
-            println!("");
-            println!("");
-            println!("Error: {}", error);
-            println!("Example input: {}", example);
-            println!("");
-            println!("");
-
-            todo!("Instead of hardcoding the example input, instead compose it? Need to make it agnostic to updates.");
-
+            println!("Error: {}", e.pretty_print());
+            println!(
+                "{}",
+                Command::examples()
+                    .iter()
+                    .map(|m| format!("Example: {}", m))
+                    .collect::<Vec<String>>()
+                    .join("\n")
+            );
             Err(e.into())
         }
     }

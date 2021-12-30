@@ -18,6 +18,10 @@ pub fn execute(path: &str) -> Vec<File> {
                 .unwrap_or_default()
                 .to_string();
             let path = f.path().clone();
+            let directory = match f.path().parent() {
+                Some(p) => p.to_string_lossy().to_string(),
+                None => "".into(),
+            };
 
             let modified_at = f
                 .metadata()
@@ -37,6 +41,7 @@ pub fn execute(path: &str) -> Vec<File> {
 
             File {
                 created_at,
+                directory,
                 name,
                 path: path.to_string_lossy().to_string(),
                 extension,

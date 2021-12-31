@@ -23,29 +23,14 @@ impl From<CommandErr> for WitdErr {
     }
 }
 
+#[derive(Debug, PartialEq)]
 pub struct Witd {
     command: Command,
     files: HashMap<String, File>,
 }
 
 impl Witd {
-    pub fn new(command: Command) -> Self {
-        Self {
-            command,
-            files: HashMap::new(),
-        }
-    }
-
-    // TODO: tests
-    fn insert(&mut self, file: File) {
-        self.files.insert(file.path.clone(), file);
-    }
-
-    // TODO: tests
-    fn get_file(&self, file: &File) -> Option<&File> {
-        self.files.get(&file.path)
-    }
-
+    /// Executes the given instance on the collection of files.
     pub fn execute(&mut self, files: Vec<File>) -> Result<(), WitdErr> {
         let mut execute_directory = false;
         for file in files.iter() {
@@ -79,22 +64,64 @@ impl Witd {
 
         Ok(())
     }
+
+    /// Attempts to retrieve the given file.
+    fn get_file(&self, file: &File) -> Option<&File> {
+        self.files.get(&file.path)
+    }
+
+    /// Inserts a file into the hashmap.
+    fn insert(&mut self, file: File) {
+        self.files.insert(file.path.clone(), file);
+    }
+
+    /// Creates a new Watcher in the Deep object
+    pub fn new(command: Command) -> Self {
+        Self {
+            command,
+            files: HashMap::new(),
+        }
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    #[test]
-    fn tests() {
-        todo!("WITD tests!");
+    fn cmd() -> Command {
+        Command::parse("directory . do echo end").unwrap()
     }
 
-    describe!(add_path => {
-
+    describe!(execute => {
+        #[test]
+        fn tests(){
+            todo!()
+        }
     });
 
-    describe!(paths => {
+    describe!(get_file => {
+        #[test]
+        fn returns_none_for_nonexistant_obj(){
+            todo!();
+        }
 
+        #[test]
+        fn returns_some_for_existant_obj(){
+            todo!();
+        }
+    });
+
+    describe!(insert => {
+        #[test]
+        fn inserts_obj(){
+            todo!();
+        }
+    });
+
+    describe!(new => {
+        #[test]
+        fn returns_expected(){
+            assert_eq!(Witd{ command: cmd(), files: HashMap::new() }, Witd::new(cmd()));
+        }
     });
 }

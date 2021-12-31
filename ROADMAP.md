@@ -5,8 +5,8 @@
 - [x] Redo code structure + add tests
 - [x] Redo parsing to allow run modes and follow examples
 - [x] Add ability to do multiple commands, e.g. split by a ';;'
+- [x] Do a deep dive on the blog
 - [ ] Add in where clauses to whitelist certain things, file types, etc. Example would be `where [EXT in [obj, gltf, png] DIR in [test/test/test]]`. Not sure what it will look like, maybe don't add in logicals (and, or) due to complexity right now.
 - [ ] Add validation for interpolated vars depending on run mode.
 - [ ] Add help option
 - [ ] Fill out readme
-- [ ] Do a deep dive on the blog
